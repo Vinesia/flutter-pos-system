@@ -17,17 +17,29 @@ dependencies:
   uuid: ^4.5.1
   intl: ^0.20.2
   fl_chart: ^1.0.0
+  printing: ^5.14.2
+  pdf: ^3.11.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0  # Sesuaikan agar kompatibel dengan SDK 3.7.0
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  image_path: assets/logo1.png
+  android: true
+  ios: true
 
 flutter:
   uses-material-design: true
-
   assets:
     - assets/latte.png
     - assets/americano.png
     - assets/mocha.png
     - assets/cappuccino.png
+    - assets/logo1.png
+    - assets/logo2.png
+    - assets/logo-roastory.png
+    - assets/croissant.png
+    - assets/brownie.png
