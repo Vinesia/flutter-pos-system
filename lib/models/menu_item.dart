@@ -2,11 +2,13 @@ class MenuItem {
   final String name;
   final String imageUrl;
   final int price;
+  final String category;
 
   MenuItem({
     required this.name,
     required this.imageUrl,
     required this.price,
+    required this.category,
   });
 
   @override

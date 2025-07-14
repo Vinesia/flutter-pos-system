@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/menu_item.dart';
-import 'confirmation_page.dart';
+import 'receipt_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -17,11 +17,13 @@ class OrderFormPage extends StatefulWidget {
 class _OrderFormPageState extends State<OrderFormPage> {
   final _nameController = TextEditingController();
   String _selectedMilk = 'Full Cream';
-  List<String> _extras = [];
+  String _selectedSugar = 'Normal';
+  String _selectedIce = 'Normal';
   bool _isSubmitting = false;
 
-  final List<String> milkOptions = ['Full Cream', 'Almond', 'Soy'];
-  final List<String> extrasOptions = ['Extra Shot', 'Less Sugar', 'Ice'];
+  final List<String> milkOptions = ['Full Cream', 'Oatside', 'Almond', 'Tidak Ada'];
+  final List<String> sugarOptions = ['Normal', 'Less Sugar', 'No Sugar'];
+  final List<String> iceOptions = ['Normal', 'Less Ice', 'No Ice', 'Hot'];
 
   Future<void> _submitOrder() async {
     if (_nameController.text.trim().isEmpty) {
@@ -40,19 +42,46 @@ class _OrderFormPageState extends State<OrderFormPage> {
     final dateKey = DateFormat('dd-MM-yyyy').format(now);
     final orderId = 'order_$uuid';
 
+    final total = widget.selectedItems.entries
+        .map((e) => e.key.price * e.value)
+        .fold(0, (a, b) => a + b);
+
+    Map<String, double> categoryTotals = {};
+    for (var entry in widget.selectedItems.entries) {
+      final category = entry.key.category.toLowerCase().trim();
+      final subtotal = entry.key.price * entry.value;
+      categoryTotals[category] = (categoryTotals[category] ?? 0) + subtotal;
+    }
+
+    String dominantCategory = 'lainnya';
+    double maxTotal = 0;
+    categoryTotals.forEach((cat, catTotal) {
+      if (catTotal > maxTotal) {
+        maxTotal = catTotal;
+        dominantCategory = cat;
+      }
+    });
+
     final orderRef = FirebaseFirestore.instance
         .collection('orders')
         .doc(dateKey)
         .collection('daily_orders')
         .doc(orderId);
 
+    bool hasDrink = widget.selectedItems.keys.any(
+      (item) => item.category.toLowerCase().contains('minuman'),
+    );
+
     await orderRef.set({
       'name': _nameController.text.trim(),
-      'milk': _selectedMilk,
-      'extras': _extras,
+      'milk': hasDrink ? _selectedMilk : null,
+      'sugar': hasDrink ? _selectedSugar : null,
+      'ice': hasDrink ? _selectedIce : null,
       'items': widget.selectedItems.map((item, qty) => MapEntry(item.name, qty)),
       'status': 'pending',
       'timestamp': FieldValue.serverTimestamp(),
+      'total': total,
+      'category': dominantCategory,
     });
 
     setState(() {
@@ -63,9 +92,15 @@ class _OrderFormPageState extends State<OrderFormPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => ConfirmationPage(
+          builder: (_) => ReceiptPage(
             orderId: orderId,
             dateKey: dateKey,
+            customerName: _nameController.text.trim(),
+            items: widget.selectedItems.map((item, qty) => MapEntry(item.name, qty)),
+            total: total,
+            milk: hasDrink ? _selectedMilk : null,
+            sugar: hasDrink ? _selectedSugar : null,
+            ice: hasDrink ? _selectedIce : null,
           ),
         ),
       );
@@ -77,6 +112,10 @@ class _OrderFormPageState extends State<OrderFormPage> {
     final total = widget.selectedItems.entries
         .map((e) => e.key.price * e.value)
         .fold(0, (a, b) => a + b);
+
+    bool hasDrink = widget.selectedItems.keys.any(
+      (item) => item.category.toLowerCase().contains('minuman'),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -105,40 +144,61 @@ class _OrderFormPageState extends State<OrderFormPage> {
               decoration: const InputDecoration(hintText: 'Masukkan nama Anda'),
             ),
             const SizedBox(height: 16),
-            const Text('Pilih Susu', style: TextStyle(fontWeight: FontWeight.w600)),
-            DropdownButton<String>(
-              value: _selectedMilk,
-              items: milkOptions.map((milk) {
-                return DropdownMenuItem(value: milk, child: Text(milk));
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedMilk = value!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            const Text('Tambahan', style: TextStyle(fontWeight: FontWeight.w600)),
-            Wrap(
-              spacing: 10,
-              children: extrasOptions.map((extra) {
-                final isSelected = _extras.contains(extra);
-                return FilterChip(
-                  label: Text(extra),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _extras.add(extra);
-                      } else {
-                        _extras.remove(extra);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 32),
+
+            if (hasDrink) ...[
+              const Text('Pilih Susu', style: TextStyle(fontWeight: FontWeight.w600)),
+              Wrap(
+                spacing: 10,
+                children: milkOptions.map((option) {
+                  return ChoiceChip(
+                    label: Text(option),
+                    selected: _selectedMilk == option,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedMilk = option;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              const Text('Pilih Gula', style: TextStyle(fontWeight: FontWeight.w600)),
+              Wrap(
+                spacing: 10,
+                children: sugarOptions.map((option) {
+                  return ChoiceChip(
+                    label: Text(option),
+                    selected: _selectedSugar == option,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedSugar = option;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              const Text('Pilih Es', style: TextStyle(fontWeight: FontWeight.w600)),
+              Wrap(
+                spacing: 10,
+                children: iceOptions.map((option) {
+                  return ChoiceChip(
+                    label: Text(option),
+                    selected: _selectedIce == option,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedIce = option;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            const Divider(height: 32),
             Text('Total: Rp$total', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             SizedBox(
